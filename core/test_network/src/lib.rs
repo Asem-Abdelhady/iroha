@@ -7,7 +7,10 @@ use std::{collections::BTreeMap, path::Path, sync::Arc, thread};
 use eyre::Result;
 use futures::{prelude::*, stream::FuturesUnordered};
 use iroha::Iroha;
-use iroha_client::client::{Client, QueryOutput};
+use iroha_client::{
+    client::{Client, QueryOutput},
+    data_model::{isi::Instruction, peer::Peer as DataModelPeer, prelude::*, query::Query, Level},
+};
 use iroha_config::{
     base::proxy::{LoadFromEnv, Override},
     client::Configuration as ClientConfiguration,
@@ -16,9 +19,6 @@ use iroha_config::{
     torii::Configuration as ToriiConfiguration,
 };
 use iroha_crypto::prelude::*;
-use iroha_data_model::{
-    isi::Instruction, peer::Peer as DataModelPeer, prelude::*, query::Query, Level,
-};
 use iroha_genesis::{GenesisNetwork, RawGenesisBlock};
 use iroha_logger::{Configuration as LoggerConfiguration, InstrumentFutures};
 use iroha_primitives::{
@@ -26,7 +26,7 @@ use iroha_primitives::{
     unique_vec,
     unique_vec::UniqueVec,
 };
-use rand::seq::IteratorRandom;
+use rand::{seq::IteratorRandom, thread_rng};
 use serde_json::json;
 use tempfile::TempDir;
 use tokio::{
@@ -179,7 +179,12 @@ impl Network {
         )
         .await
         .expect("Failed to init peers");
-        let client = Client::test(&network.genesis.api_address);
+        let client = Client::test(
+            &Network::peers(&network)
+                .choose(&mut thread_rng())
+                .unwrap()
+                .api_address,
+        );
         (network, client)
     }
 
@@ -197,7 +202,12 @@ impl Network {
     /// Adds peer to network and waits for it to start block
     /// synchronization.
     pub async fn add_peer(&self) -> (Peer, Client) {
-        let genesis_client = Client::test(&self.genesis.api_address);
+        let client = Client::test(
+            &Network::peers(self)
+                .choose(&mut thread_rng())
+                .unwrap()
+                .api_address,
+        );
 
         let mut config = Configuration::test();
         config.sumeragi.trusted_peers.peers =
@@ -212,13 +222,10 @@ impl Network {
         time::sleep(Configuration::pipeline_time() + Configuration::block_sync_gossip_time()).await;
 
         let add_peer = RegisterExpr::new(DataModelPeer::new(peer.id.clone()));
-        genesis_client
-            .submit(add_peer)
-            .expect("Failed to add new peer.");
+        client.submit(add_peer).expect("Failed to add new peer.");
 
-        let client = Client::test(&peer.api_address);
-
-        (peer, client)
+        let peer_client = Client::test(&peer.api_address);
+        (peer, peer_client)
     }
 
     /// Creates new network with some offline peers
@@ -359,7 +366,7 @@ pub struct Peer {
     pub iroha: Option<Iroha>,
     /// Temporary directory
     // Note: last field to be dropped after Iroha (struct fields drops in FIFO RFC 1857)
-    temp_dir: Option<Arc<TempDir>>,
+    pub temp_dir: Option<Arc<TempDir>>,
 }
 
 impl From<Peer> for Box<iroha_core::tx::Peer> {
@@ -560,7 +567,7 @@ impl PeerBuilder {
     /// Set Iroha configuration
     #[must_use]
     pub fn with_configuration(mut self, configuration: Configuration) -> Self {
-        self.configuration.replace(configuration);
+        self.configuration = Some(configuration);
         self
     }
 

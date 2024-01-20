@@ -1,21 +1,22 @@
 use std::{str::FromStr as _, thread};
 
 use eyre::Result;
-use iroha_client::client::{self, QueryResult};
-use iroha_crypto::KeyPair;
-use iroha_data_model::{
-    parameter::{default::MAX_TRANSACTIONS_IN_BLOCK, ParametersBuilder},
-    prelude::*,
+use iroha_client::{
+    client::{self, QueryResult},
+    crypto::KeyPair,
+    data_model::{
+        parameter::{default::MAX_TRANSACTIONS_IN_BLOCK, ParametersBuilder},
+        prelude::*,
+    },
 };
+use iroha_config::iroha::Configuration;
 use test_network::*;
-
-use super::Configuration;
 
 #[test]
 fn client_add_asset_quantity_to_existing_asset_should_increase_asset_amount_on_another_peer(
 ) -> Result<()> {
     // Given
-    let (_rt, network, client) = <Network>::start_test_with_runtime(4, Some(10_450));
+    let (_rt, network, client) = Network::start_test_with_runtime(4, Some(10_450));
     wait_for_genesis_committed(&network.clients(), 0);
     let pipeline_time = Configuration::pipeline_time();
 

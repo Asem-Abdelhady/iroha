@@ -1,13 +1,14 @@
 use core::sync::atomic::Ordering;
 use std::thread;
 
-use iroha_client::client::{self, Client, QueryResult};
-use iroha_data_model::{prelude::*, Level};
+use iroha_client::{
+    client::{self, Client, QueryResult},
+    data_model::{prelude::*, Level},
+};
+use iroha_config::iroha::Configuration;
 use rand::seq::SliceRandom;
 use test_network::*;
 use tokio::runtime::Runtime;
-
-use super::Configuration;
 
 const MAX_TRANSACTIONS_IN_BLOCK: u32 = 5;
 
@@ -58,7 +59,7 @@ fn unstable_network(
         {
             configuration.sumeragi.debug_force_soft_fork = force_soft_fork;
         }
-        let network = <Network>::new_with_offline_peers(
+        let network = Network::new_with_offline_peers(
             Some(configuration),
             n_peers + n_offline_peers,
             0,

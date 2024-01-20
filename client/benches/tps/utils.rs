@@ -11,10 +11,12 @@ use std::{
 };
 
 use eyre::{Result, WrapErr};
-use iroha_client::client::Client;
-use iroha_data_model::{
-    parameter::{default::MAX_TRANSACTIONS_IN_BLOCK, ParametersBuilder},
-    prelude::*,
+use iroha_client::{
+    client::Client,
+    data_model::{
+        parameter::{default::MAX_TRANSACTIONS_IN_BLOCK, ParametersBuilder},
+        prelude::*,
+    },
 };
 use serde::Deserialize;
 use serde_json::json;
@@ -55,7 +57,7 @@ impl Config {
 
     pub fn measure(self) -> Result<Tps> {
         // READY
-        let (_rt, network, client) = <Network>::start_test_with_runtime(self.peers, None);
+        let (_rt, network, client) = Network::start_test_with_runtime(self.peers, None);
         let clients = network.clients();
         wait_for_genesis_committed(&clients, 0);
 
@@ -164,7 +166,8 @@ impl MeasurerUnit {
 
     /// Submit initial transactions for measurement
     fn ready(self) -> Result<Self> {
-        let keypair = iroha_crypto::KeyPair::generate().expect("Failed to generate KeyPair.");
+        let keypair =
+            iroha_client::crypto::KeyPair::generate().expect("Failed to generate KeyPair.");
 
         let account_id = account_id(self.name);
         let alice_id = AccountId::from_str("alice@wonderland")?;
